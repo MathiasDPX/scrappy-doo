@@ -34,8 +34,14 @@ def handle_reaction_removed(event, say, client):
     if author != user_id:
         return
     
-    Post.delete_by_id(msg_id)
-    print(f"Deleted {msg_id}")
+    success = Post.delete_by_id(msg_id)
+    
+    if success:
+        client.chat_postEphemeral(
+            channel=event["item"]["channel"],
+            user=user_id,
+            text=f"You're post have been deleted!"
+        )
 
 
 @app.event("reaction_added")
@@ -73,7 +79,9 @@ def handle_reaction_added(event, say, client):
     post.save()
     
     client.chat_postEphemeral(
-        channel=
+        channel=event["item"]["channel"],
+        user=user_id,
+        text=f"You're post have been saved!"
     )
 
 
