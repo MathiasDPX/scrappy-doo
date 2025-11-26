@@ -38,8 +38,12 @@ class Post(Base):
 
     # Instance methods
     def save(self):
+        if session.query(Post).filter_by(message_id=self.message_id).first():
+            return False
+            
         session.add(self)
         session.commit()
+        return True
 
     def delete(self):
         session.delete(self)
