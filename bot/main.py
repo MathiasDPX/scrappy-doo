@@ -11,7 +11,7 @@ load_dotenv()
 app = App()
 bot_id = getenv("BOT_UID", "U09VC4NQXC6")
 
-reactions:dict = []
+reactions: dict = []
 with open("reactions.json", "r", encoding="utf-8") as f:
     # load reactions or die
     reactions = json.load(f)
@@ -31,8 +31,8 @@ def remove_reactions(shortcut, client):
 
     for reaction in reactions:
         if bot_id not in reaction["users"]:
-            continue 
-        
+            continue
+
         client.reactions_remove(channel=channel, timestamp=ts, name=reaction["name"])
 
 
@@ -40,25 +40,53 @@ def add_reactions(shortcut, client):
     message = shortcut["message"]["text"]
     channel = shortcut["channel"]["id"]
     ts = shortcut["message"]["ts"]
-    
+
     tags = []
     for keyword, emoji in reactions.items():
         if keyword not in message:
             continue
-        
+
         try:
-            client.reactions_add(
-                channel=channel,
-                timestamp=ts,
-                name=emoji
-            )
+            client.reactions_add(channel=channel, timestamp=ts, name=emoji)
         except:
             pass
-        
+
         tags.append(keyword)
-        
+
     return tags
 
+
+def get_reactions(message, author_id, bot_id):
+    reactions = set()
+    for reaction in message.get("reactions", []):
+        if any(user == author_id for user in reaction["users"]):
+            reactions.add(reaction["name"])
+        if any(user == bot_id for user in reaction["users"]):
+            reactions.add(reaction["name"])
+    return list(reactions)
+
+
+@app.event("reaction_added")
+@app.event("reaction_removed")
+def handle_reaction(event, say, client):
+    if event["user"] != event["item_user"]:
+        return
+
+    response = client.conversations_history(
+        channel=event["item"]["channel"],
+        latest=event["item"]["ts"],
+        inclusive=True,
+        limit=1,
+    )
+    message = response["messages"][0]
+    msg_id = message["client_msg_id"]
+
+    post = Post.get_by_id(msg_id)
+    if not post:
+        return
+
+    reactions = get_reactions(message, event["item_user"], bot_id)
+    post.set_tags(reactions)
 
 
 @app.shortcut("unpost_message")

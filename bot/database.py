@@ -1,9 +1,10 @@
 import os
 from datetime import datetime
-from sqlalchemy import create_engine, Column, String, Text, TIMESTAMP, ARRAY
+from sqlalchemy import create_engine, Column, String, Text, TIMESTAMP, ARRAY, exists
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql import func
 from dotenv import load_dotenv
+from sqlalchemy.ext.mutable import MutableList  # NEW
 
 # Load environment variables
 load_dotenv()
@@ -21,7 +22,7 @@ engine = create_engine(DATABASE_URL, echo=False)
 Base = declarative_base()
 
 # Create session factory
-SessionLocal = sessionmaker(bind=engine)
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)  # CHANGED
 session = SessionLocal()
 
 
@@ -34,19 +35,23 @@ class Post(Base):
     timestamp = Column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
-    tags = Column(ARRAY(String), default=[])
+    tags = Column(MutableList.as_mutable(ARRAY(String)), default=list)  # CHANGED
 
     # Instance methods
     def save(self):
         if session.query(Post).filter_by(message_id=self.message_id).first():
             return False
-            
+
         session.add(self)
         session.commit()
         return True
 
     def delete(self):
         session.delete(self)
+        session.commit()
+
+    def set_tags(self, tags):
+        self.tags = tags
         session.commit()
 
     # Class methods
