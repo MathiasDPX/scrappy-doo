@@ -6,6 +6,7 @@ from slack_sdk.web.client import WebClient
 from database import *
 from os import getenv
 import traceback
+import requests
 import json
 
 load_dotenv()
@@ -123,6 +124,38 @@ def handle_unpost(ack, shortcut, client):
             user=author,
             text=f"Unable to delete this post :sadgua:\n```{traceback.format_exc()}```",
         )
+        
+
+@app.command("/import-scrapbook")
+def import_scrapbook(ack, respond, command):
+    ack()
+    username = command['user_name']
+    userid = command['user_id']
+    
+    r = requests.get(f"https://scrapbook.hackclub.com/api/users/{username}")
+    data = r.json()
+    r.raise_for_status()
+    
+    posts_to_import = []
+    for post_data in data.get("posts", []):
+        try:
+            tags = [tag['name'] for tag in post_data.get('reactions')]
+            
+            ts = datetime.fromtimestamp(float(post_data.get("timestamp")), tz=timezone.utc)
+            post = Post(
+                message_id = post_data.get("id"),
+                message = post_data.get("text"),
+                author = userid,
+                timestamp = ts,
+                tags = tags,
+                files = post_data.get("attachments", [])
+            )
+            posts_to_import.append(post)
+        except Exception as e:
+            pass
+    
+    success_count = Post.save_batch(posts_to_import)
+    respond(f":agabusiness: {success_count} posts exported!")
 
 
 @app.shortcut("post_message")

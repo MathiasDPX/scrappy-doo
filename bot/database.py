@@ -88,6 +88,23 @@ class Post(Base):
             return True
         return False
 
+    @classmethod
+    def save_batch(cls, posts):
+        """Save multiple posts in a single transaction. Returns count of successfully saved posts."""
+        existing_ids = {
+            row[0] for row in session.query(cls.message_id)
+            .filter(cls.message_id.in_([p.message_id for p in posts]))
+            .all()
+        }
+
+        new_posts = [p for p in posts if p.message_id not in existing_ids]
+
+        if new_posts:
+            session.bulk_save_objects(new_posts)
+            session.commit()
+
+        return len(new_posts)
+
 
 def init_db():
     """Creates tables if they do not exist."""
