@@ -1,10 +1,9 @@
 import os
-from datetime import datetime
-from sqlalchemy import create_engine, Column, String, Text, TIMESTAMP, ARRAY, exists
+from sqlalchemy import create_engine, Column, String, Text, TIMESTAMP, ARRAY
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql import func
 from dotenv import load_dotenv
-from sqlalchemy.ext.mutable import MutableList  # NEW
+from sqlalchemy.ext.mutable import MutableList
 
 # Load environment variables
 load_dotenv()
@@ -22,7 +21,7 @@ engine = create_engine(DATABASE_URL, echo=False)
 Base = declarative_base()
 
 # Create session factory
-SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)  # CHANGED
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 session = SessionLocal()
 
 
@@ -35,7 +34,8 @@ class Post(Base):
     timestamp = Column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
-    tags = Column(MutableList.as_mutable(ARRAY(String)), default=list)  # CHANGED
+    tags = Column(MutableList.as_mutable(ARRAY(String)), default=list)
+    files = Column(MutableList.as_mutable(ARRAY(String)), default=list)
 
     # Instance methods
     def save(self):
@@ -52,6 +52,11 @@ class Post(Base):
 
     def set_tags(self, tags):
         self.tags = tags
+        session.commit()
+
+    def set_files(self, files):
+        """Set the files list for this post."""
+        self.files = files
         session.commit()
 
     # Class methods
@@ -87,3 +92,6 @@ class Post(Base):
 def init_db():
     """Creates tables if they do not exist."""
     Base.metadata.create_all(engine)
+
+if __name__ == "__main__":
+    init_db()
