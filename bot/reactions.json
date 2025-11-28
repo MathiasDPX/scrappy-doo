@@ -1,4 +1,9 @@
 {
-    "github": "github",
-    ":50days:": "50days"
+    "kv": {
+        "github": "github",
+        ":50days:": "50days"
+    },
+    "blacklist": [
+        ":scrappy:"
+    ]
 }

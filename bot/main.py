@@ -1,8 +1,8 @@
-from dotenv import load_dotenv
-from slack_bolt import App
-from datetime import datetime, timezone
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_sdk.web.client import WebClient
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+from slack_bolt import App
 from database import *
 from os import getenv
 import traceback
@@ -13,14 +13,13 @@ load_dotenv()
 app = App()
 bot_id = getenv("BOT_UID", "U09VC4NQXC6")
 
-reactions: dict = []
+reactions = {}
 with open("reactions.json", "r", encoding="utf-8") as f:
     # load reactions or die
     reactions = json.load(f)
 
 
 def remove_reactions(shortcut, client):
-    msg_id = shortcut["message"]["client_msg_id"]
     ts = shortcut["message"]["ts"]
     channel = shortcut["channel"]["id"]
 
@@ -44,7 +43,7 @@ def add_reactions(shortcut, client):
     ts = shortcut["message"]["ts"]
 
     tags = []
-    for keyword, emoji in reactions.items():
+    for keyword, emoji in reactions["kv"].items():
         if keyword not in message:
             continue
 
@@ -60,12 +59,102 @@ def add_reactions(shortcut, client):
 
 def get_reactions(message: dict, author_id: str, bot_id: str) -> list[str]:
     reactions = set()
+    
+    authorized = [author_id, bot_id, "U015D6A36AG"] # scrappy
+    
     for reaction in message.get("reactions", []):
-        if any(user == author_id for user in reaction["users"]):
-            reactions.add(reaction["name"])
-        if any(user == bot_id for user in reaction["users"]):
+        if any(user in [authorized] for user in reaction["users"]) and not (any(reaction["name"] in reactions["blacklist"])):
             reactions.add(reaction["name"])
     return list(reactions)
+
+
+def process_message_post(
+    message: dict, channel: str, client: WebClient
+) -> tuple[bool, str]:
+    content = message["text"]
+    msg_id = message["client_msg_id"]
+    author = message["user"]
+    ts = datetime.fromtimestamp(float(message["ts"]), tz=timezone.utc)
+
+    files = []
+    for file in message.get("files", []):
+        if not (
+            file["mimetype"].startswith("image/")
+            or file["mimetype"].startswith("video/")
+        ):
+            continue
+        files.append(file["url_private"])
+
+    if len(files) == 0:
+        return False, "You need to have images or videos in your post"
+
+    tags = add_reactions({"message": message, "channel": {"id": channel}}, client)
+
+    post = Post(
+        message_id=msg_id,
+        author=author,
+        message=content,
+        timestamp=ts,
+        tags=tags,
+        files=files,
+    )
+
+    success = post.save()
+
+    if success:
+        return True, "Your post has been saved!"
+    else:
+        return False, "This has already been post :sadgua:"
+
+
+@app.event("message")
+def new_message(event, say, client):
+    if event.get("channel") not in ["C09VC37P2NA", "C01504DCLVD"]:
+        #  Only #scrappy-doo or #scrapbook
+        return
+
+    if event.get("subtype") == "message_deleted":
+        msg_id = event["previous_message"]["client_msg_id"]
+        Post.delete_by_id(msg_id)
+
+        client.chat_postEphemeral(
+            channel=event["channel"],
+            user=event["previous_message"]["user"],
+            text=f"Your post has been deleted :agabye:",
+        )
+
+        return
+    
+    if event.get("thread_ts") != None:
+        # Message sent in a thread
+        return
+
+    # Check if message has files before processing
+    if not event.get("files"):
+        client.chat_postEphemeral(
+            channel=event["channel"],
+            user=event["user"],
+            text="You need to have images or videos in your post",
+        )
+        return
+
+    try:
+        success, msg = process_message_post(
+            message=event, channel=event["channel"], client=client
+        )
+
+        # Show message for both success and failure
+        client.chat_postEphemeral(
+            channel=event["channel"],
+            user=event["user"],
+            text=msg,
+        )
+    except Exception as e:
+        client.chat_postEphemeral(
+            channel=event["channel"],
+            user=event["user"],
+            text=f"Unable to auto-post this message :sadgua:\n```{str(e)}```",
+        )
 
 
 @app.event("reaction_added")
@@ -124,36 +213,38 @@ def handle_unpost(ack, shortcut, client):
             user=author,
             text=f"Unable to delete this post :sadgua:\n```{traceback.format_exc()}```",
         )
-        
+
 
 @app.command("/import-scrapbook")
 def import_scrapbook(ack, respond, command):
     ack()
-    username = command['user_name']
-    userid = command['user_id']
-    
+    username = command["user_name"]
+    userid = command["user_id"]
+
     r = requests.get(f"https://scrapbook.hackclub.com/api/users/{username}")
     data = r.json()
     r.raise_for_status()
-    
+
     posts_to_import = []
     for post_data in data.get("posts", []):
         try:
-            tags = [tag['name'] for tag in post_data.get('reactions')]
-            
-            ts = datetime.fromtimestamp(float(post_data.get("timestamp")), tz=timezone.utc)
+            tags = [tag["name"] for tag in post_data.get("reactions")]
+
+            ts = datetime.fromtimestamp(
+                float(post_data.get("timestamp")), tz=timezone.utc
+            )
             post = Post(
-                message_id = post_data.get("id"),
-                message = post_data.get("text"),
-                author = userid,
-                timestamp = ts,
-                tags = tags,
-                files = post_data.get("attachments", [])
+                message_id=post_data.get("id"),
+                message=post_data.get("text"),
+                author=userid,
+                timestamp=ts,
+                tags=tags,
+                files=post_data.get("attachments", []),
             )
             posts_to_import.append(post)
         except Exception as e:
             pass
-    
+
     success_count = Post.save_batch(posts_to_import)
     respond(f":agabusiness: {success_count} posts exported!")
 
@@ -164,8 +255,6 @@ def handle_post(ack, shortcut, client: WebClient):
         ack()
 
         message = shortcut["message"]
-        content = message["text"]
-        msg_id = message["client_msg_id"]
         channel = shortcut["channel"]["id"]
         author = message["user"]
         shortcut_author = shortcut["user"]["id"]
@@ -178,52 +267,15 @@ def handle_post(ack, shortcut, client: WebClient):
             )
             return
 
-        ts = message["ts"]
-        ts = datetime.fromtimestamp(float(ts), tz=timezone.utc)
-
-        files = []
-        for file in message.get("files", []):
-            if not (
-                file["mimetype"].startswith("image/")
-                or file["mimetype"].startswith("video/")
-            ):
-                continue
-
-            # TODO  Make the link public
-            files.append(file["url_private"])
-
-        if len(files) == 0:
-            client.chat_postEphemeral(
-                channel=channel,
-                user=author,
-                text="You need to have images or videos in your post",
-            )
-            return
-
-        tags = add_reactions(shortcut, client)
-        post = Post(
-            message_id=msg_id,
-            author=author,
-            message=content,
-            timestamp=ts,
-            tags=tags,
-            files=files,
+        success, msg = process_message_post(
+            message=message, channel=channel, client=client
         )
 
-        success = post.save()
-
-        if success:
-            client.chat_postEphemeral(
-                channel=channel,
-                user=author,
-                text="Your post has been saved!",
-            )
-        else:
-            client.chat_postEphemeral(
-                channel=channel,
-                user=author,
-                text="This has already been post :sadgua:",
-            )
+        client.chat_postEphemeral(
+            channel=channel,
+            user=author,
+            text=msg,
+        )
     except:
         client.chat_postEphemeral(
             channel=channel,
