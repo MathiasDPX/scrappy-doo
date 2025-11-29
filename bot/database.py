@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, Column, String, Text, TIMESTAMP, ARRAY
+from sqlalchemy import create_engine, Column, String, Text, TIMESTAMP, ARRAY, UniqueConstraint
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql import func
 from dotenv import load_dotenv
@@ -37,9 +37,17 @@ class Post(Base):
     tags = Column(MutableList.as_mutable(ARRAY(String)), default=list)
     files = Column(MutableList.as_mutable(ARRAY(String)), default=list)
 
+    __table_args__ = (
+        UniqueConstraint('author', 'timestamp', name='uq_author_timestamp'),
+    )
+
     # Instance methods
     def save(self):
         if session.query(Post).filter_by(message_id=self.message_id).first():
+            return False
+        
+        # Check for existing author-timestamp combination
+        if session.query(Post).filter_by(author=self.author, timestamp=self.timestamp).first():
             return False
 
         session.add(self)
@@ -97,7 +105,20 @@ class Post(Base):
             .all()
         }
 
-        new_posts = [p for p in posts if p.message_id not in existing_ids]
+        # Check for existing author-timestamp combinations
+        from sqlalchemy import tuple_
+        author_timestamp_pairs = [(p.author, p.timestamp) for p in posts]
+        existing_author_timestamps = {
+            (row[0], row[1]) for row in session.query(cls.author, cls.timestamp)
+            .filter(tuple_(cls.author, cls.timestamp).in_(author_timestamp_pairs))
+            .all()
+        }
+
+        new_posts = [
+            p for p in posts 
+            if p.message_id not in existing_ids 
+            and (p.author, p.timestamp) not in existing_author_timestamps
+        ]
 
         if new_posts:
             session.bulk_save_objects(new_posts)
