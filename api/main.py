@@ -58,5 +58,15 @@ def file_proxy(id, filename):
     return resp
 
 
+@app.route("/latests")
+def latests():
+    limit = request.args.get("limit", 50, type=int)
+
+    posts = Post.get_latests(limit=limit)
+    json_posts = [post.asdict() for post in posts]
+    json_posts = fix_links(json_posts)
+
+    return json_posts
+
 if __name__ == "__main__":
     app.run()

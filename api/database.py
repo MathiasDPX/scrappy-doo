@@ -106,6 +106,15 @@ class Post(Base):
         return session.query(cls).filter_by(author=author).limit(limit).offset(offset).all()
 
     @classmethod
+    def get_latests(cls, limit=50):
+        return (
+            session.query(cls)
+            .order_by(cls.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
+    @classmethod
     def get_by_tag(cls, tag, limit=50, offset=0):
         limit = min(limit, 100)
         return (
