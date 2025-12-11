@@ -73,8 +73,8 @@ class Post(Base):
         return session.query(cls).filter_by(message_id=id_).first()
 
     @classmethod
-    def get_by_author(cls, author):
-        return session.query(cls).filter_by(author=author).all()
+    def get_by_author(cls, author, limit=50):
+        return session.query(cls).filter_by(author=author).limit(limit).all()
 
     @classmethod
     def get_by_tag(cls, tag, limit=50):
