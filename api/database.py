@@ -103,7 +103,7 @@ class Post(Base):
 
     @classmethod
     def get_by_author(cls, author, limit=50, offset=0):
-        return session.query(cls).filter_by(author=author).limit(limit).offset(offset).order_by(cls.timestamp.desc()).all()
+        return session.query(cls).filter_by(author=author).order_by(cls.timestamp.desc()).limit(limit).offset(offset).all()
 
     @classmethod
     def get_latests(cls, limit=50):
