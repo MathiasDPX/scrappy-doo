@@ -1,7 +1,45 @@
 {
     "kv": {
+        "nest": "nest",
+        "hcb": "bank-hackclub-dark",
+        "bank": "bank-hackclub-dark",
+        "orpheus": "orpheus",
+
+        "rss": "rss",
+        "typescript": "ts",
+        "ts": "ts",
+        "javascript": "javascript",
+        "js": "javascript",
+        "python": "python",
+        "rust": "rust",
+        "gleam": "gleam",
+        "svelte": "svelte",
+        "golang": "gopher",
+        "gopher": "gopher",
+
         "github": "github",
-        ":50days:": "50days"
+        "aseprite": "aseprite",
+        "nvim": "neovim",
+        "neovim": "neovim",
+        "vi": "neovim",
+        "vim": "neovim",
+        "emacs": "emacslogo",
+        "vsc": "vsc",
+        "vscode": "vsc",
+        "kicad": "pcb",
+        "scratch": "scratch",
+
+        "pcb": "pcb",
+
+        "midnight": "midnight-sticker",
+        "moonshot": "moonshot",
+        "homelab": "homelab",
+        "tonic": "ms-smiley",
+        "compass": "compass",
+        "axiom": "axiom",
+        "dummies": "dummies",
+        "hackapet": "hackapet",
+        "50days": "50days"
     },
     "blacklist": [
         ":scrappy:"
