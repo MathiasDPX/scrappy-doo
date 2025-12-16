@@ -21,7 +21,6 @@
         "aseprite": "aseprite",
         "nvim": "neovim",
         "neovim": "neovim",
-        "vi": "neovim",
         "vim": "neovim",
         "emacs": "emacslogo",
         "vsc": "vsc",
